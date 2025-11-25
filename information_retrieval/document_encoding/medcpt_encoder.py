@@ -5,7 +5,7 @@ import numpy as np
 import torch.nn.functional as F
 
 class MEDCPTEncoder:
-    def __init__(self, model_name="ncbi/MedCPT-Query-Encoder", device=None):
+    def __init__(self, model_name="ncbi/MedCPT-Article-Encoder", device=None):
         self.device = "cuda"
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModel.from_pretrained(model_name).to(self.device)

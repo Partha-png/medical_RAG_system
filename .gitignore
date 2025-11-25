@@ -1,2 +1,9 @@
 venv/
 __pycache__/
+temp_uploads/
+faiss_container/
+.env
+.pdf
+.txt
+.faiss
+.pkl

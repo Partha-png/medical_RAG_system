@@ -1,0 +1,54 @@
+{
+  "evaluation_history": [
+    {
+      "question": "What are the symptoms of diabetes?",
+      "answer": "**Common symptoms of diabetes**\n\n| Symptom | Typical description |\n|---------|----------------------|\n| **Increased thirst (polydipsia)** | Persistent feeling of being thirsty, even after drinking fluids. |\n| **Frequent urination (polyuria)** | Need to urinate more often, especially at night. |\n| **Increased hunger (polyphagia)** | Unexplained appetite and eating more than usual. |\n| **Unexplained weight loss** | Losing weight despite normal or increased food intake (more common in type\u202f1). |\n| **Fatigue / low energy** | Feeling unusually tired or weak. |\n| **Blurred vision** | Vision may become fuzzy, especially after meals. |\n| **Slow wound healing** | Cuts, sores, or infections take longer to heal. |\n| **Recurrent infections** | Frequent urinary\u2011tract, skin, or yeast infections. |\n| **Tingling or numbness (neuropathy)** | Pins\u2011and\u2011needles or loss of sensation in hands/feet. |\n| **Dry mouth** | Mouth feels dry, often linked to dehydration from excess urination. |\n| **Irritability or mood changes** | May be more noticeable in children with type\u202f1 diabetes. |\n\n*Note:* Type\u202f1 diabetes often presents abruptly with severe symptoms (e.g., rapid weight loss, ketoacidosis). Type\u202f2 diabetes may develop slowly, and some people may have few or no symptoms initially. If you notice any of these signs, especially in combination, seek medical evaluation for blood glucose testing.",
+      "timestamp": "2025-11-25T11:07:01.280833",
+      "perplexity": 1.3211835622787476,
+      "rouge1": 0.12244897959183673,
+      "rouge2": 0.05154639175257732,
+      "rougeL": 0.08163265306122451,
+      "retrieval_precision": 0.0,
+      "retrieval_recall": 0.0,
+      "retrieval_f1": 0.0,
+      "answer_relevance": 0.5
+    },
+    {
+      "question": "How is hypertension treated?",
+      "answer": "**Hypertension is managed in two main steps: lifestyle modification and medication (when needed).**\n\n| Step | What is done | Why it matters |\n|------|--------------|----------------|\n| **1. Lifestyle / non\u2011pharmacologic measures** | \u2022 **Diet:** DASH\u2011type diet \u2013 plenty of fruits, vegetables, low\u2011fat dairy; limit saturated fat, cholesterol, and especially sodium (<\u202f1.5\u202fg/day). <br>\u2022 **Weight control:** Lose excess weight (\u22485\u202f% reduction can lower BP 5\u201320\u202fmm\u202fHg). <br>\u2022 **Physical activity:** \u2265150\u202fmin/week of moderate\u2011intensity aerobic exercise (e.g., brisk walking). <br>\u2022 **Alcohol:** \u22642 drinks/day for men, \u22641 drink/day for women. <br>\u2022 **Smoking cessation** and avoidance of second\u2011hand smoke. <br>\u2022 **Stress reduction:** Relaxation techniques, adequate sleep. | These measures lower peripheral resistance and improve overall cardiovascular risk; they are first\u2011line for all patients and may eliminate the need for drugs. |\n| **2. Pharmacologic therapy** (added when BP remains \u2265\u202f130/80\u202fmm\u202fHg in most adults, or \u2265\u202f95th percentile in children, or if target\u2011organ damage/ high risk) | \u2022 **First\u2011line drug classes** (choose based on comorbidities, age, race, renal function): <br>\u2003\u2013 **ACE inhibitors** or **ARBs** (especially with diabetes, CKD, or proteinuria). <br>\u2003\u2013 **Thiazide\u2011type diuretics** (effective in most adults; watch electrolytes). <br>\u2003\u2013 **Calcium\u2011channel blockers** (good for isolated systolic hypertension, African\u2011American patients). <br>\u2022 **Second\u2011line/add\u2011on agents** as needed: \u03b2\u2011blockers, aldosterone antagonists, direct vasodilators, renin inhibitors. <br>\u2022 **Special situations**: <br",
+      "timestamp": "2025-11-25T11:07:02.594577",
+      "perplexity": 2.4571480751037598,
+      "rouge1": 0.09361702127659573,
+      "rouge2": 0.03433476394849786,
+      "rougeL": 0.07659574468085106,
+      "retrieval_precision": 0.6666666666666666,
+      "retrieval_recall": 0.25,
+      "retrieval_f1": 0.36363636363636365,
+      "answer_relevance": 0.0
+    },
+    {
+      "question": "What causes asthma?",
+      "answer": "Asthma is caused by a combination of **genetic susceptibility** and **environmental exposures** that lead to chronic airway inflammation and hyper\u2011responsiveness. The main contributors are:\n\n| Category | Typical Triggers / Factors |\n|----------|----------------------------|\n| **Genetic factors** | Family history of asthma, atopy, specific gene variants (e.g.,\u202fIL\u20114, IL\u201113, ADAM33). |\n| **Allergens** | House\u2011dust mite, pollen, animal dander, mold spores, cockroach antigens. |\n| **Respiratory infections** | Early\u2011life viral infections (especially RSV, rhinovirus) that damage airway epithelium. |\n| **Air pollutants** | Tobacco smoke (active & second\u2011hand), ozone, nitrogen dioxide, particulate matter. |\n| **Occupational exposures** | Isocyanates, flour dust, animal proteins, chemicals in certain jobs. |\n| **Irritants** | Cold air, strong odors, cleaning agents, perfumes. |\n| **Lifestyle / other factors** | Obesity, sedentary lifestyle, gastro\u2011esophageal reflux disease (GERD), stress. |\n\nThese factors provoke an **abnormal immune response** (often Th2\u2011dominant) that releases cytokines, eosinophils, and mast\u2011cell mediators, causing airway edema, mucus hyper\u2011secretion, smooth\u2011muscle constriction, and the characteristic **reversible airflow limitation** of asthma.",
+      "timestamp": "2025-11-25T11:07:03.575306",
+      "perplexity": 2.3179421424865723,
+      "rouge1": 0.13664596273291926,
+      "rouge2": 0.05031446540880503,
+      "rougeL": 0.13664596273291926,
+      "retrieval_precision": 0.0,
+      "retrieval_recall": 0.0,
+      "retrieval_f1": 0.0,
+      "answer_relevance": 0.0
+    }
+  ],
+  "average_metrics": {
+    "perplexity": 2.03209125995636,
+    "rouge1": 0.1175706545337839,
+    "rouge2": 0.04539854036996007,
+    "rougeL": 0.09829145349166495,
+    "retrieval_precision": 0.2222222222222222,
+    "retrieval_recall": 0.08333333333333333,
+    "retrieval_f1": 0.12121212121212122,
+    "answer_relevance": 0.16666666666666666,
+    "num_queries": 3
+  }
+}
