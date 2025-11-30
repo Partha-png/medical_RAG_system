@@ -12,8 +12,8 @@ class MedCPTRetriever:
     def __init__(self, faiss_dir: str):
         self.faiss_dir = faiss_dir
         self.encoder = MEDCPTQueryEncoder()
-        self.index = faiss.read_index(f"{faiss_dir}/index.faiss")
-        with open(f"{faiss_dir}/metadata.pkl", "rb") as f:
+        self.index = faiss.read_index(f"{faiss_dir}/medcptindex.faiss")
+        with open(f"{faiss_dir}/medcptmetadata.pkl", "rb") as f:
             self.metadata = pickle.load(f)
 
     def retrieve(self, query: str, k=3):

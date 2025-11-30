@@ -51,12 +51,12 @@ def encode_documents(model_type,output_folder,input_file,batch_size=8):
         np.save(os.path.join(output_folder,f"{model_name}_embeddings.npy"),np.array(all_embeddings))
         print(f"Embeddings saved to {output_folder}")
         faiss_dir = r"C:\Users\PARTHA SARATHI\Python\medical_rag\information_retrieval\fasiss_container"
-        add_embeddings_to_faiss(np.array(all_embeddings),documents,faiss_dir)
+        add_embeddings_to_faiss(np.array(all_embeddings),documents,faiss_dir,model_type,input_folder)
         return all_embeddings
 
 
 if __name__ == "__main__":
        model_name="biobert"
-       input_folder=r"C:\Users\PARTHA SARATHI\Downloads\large_medical_document.pdf"
+       input_folder=r"C:\Users\PARTHA SARATHI\Downloads\Untitled document (1).pdf"
        output_folder=r"C:\Users\PARTHA SARATHI\Downloads"
        encode_documents (model_name,output_folder,input_folder,batch_size=8)

@@ -15,8 +15,8 @@ class BioBERTRetriever:
     def __init__(self, faiss_dir: str):
         self.faiss_dir = faiss_dir
         self.encoder = BioBERTQueryEncoder()
-        self.index = faiss.read_index(f"{faiss_dir}/index.faiss")
-        with open(f"{faiss_dir}/metadata.pkl", "rb") as f:
+        self.index = faiss.read_index(f"{faiss_dir}/biobertindex.faiss")
+        with open(f"{faiss_dir}/biobertmetadata.pkl", "rb") as f:
             self.metadata = pickle.load(f)
 
     def retrieve(self, query: str, k=3):
