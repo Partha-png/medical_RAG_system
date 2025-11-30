@@ -126,7 +126,7 @@ medical_RAG_system/
 ### Encoder Models
 
 **BioBERT** (`dmis-lab/biobert-v1.1`)
-- Pre-trained on PubMed abstracts and PMC full-text articles
+- Finetuned Bert Model on PubMed abstracts and PMC full-text articles
 - Optimized for biomedical named entity recognition and relation extraction
 - Best for: General medical literature, research papers, drug information
 
