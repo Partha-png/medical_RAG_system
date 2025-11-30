@@ -10,8 +10,6 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 
 
 class BioBERTRetriever:
-    """BioBERT FAISS vector retriever."""
-
     def __init__(self, faiss_dir: str):
         self.faiss_dir = faiss_dir
         self.encoder = BioBERTQueryEncoder()
@@ -22,18 +20,7 @@ class BioBERTRetriever:
     def retrieve(self, query: str, k=3):
         qv = self.encoder.encode(query).astype("float32")
         D, I = self.index.search(qv, k)
-        print("Indexes:", I)
-        print("Distances:", D)
         return [self.metadata[i] for i in I[0]]
-
-    # def as_langchain_retriever(self):
-    #     embedder = HuggingFaceEmbeddings(model_name="dmis-lab/biobert-v1.1")
-    #     vectorstore = FAISS.load_local(
-    #         self.faiss_dir,
-    #         embedder,
-    #         allow_dangerous_deserialization=True
-    #     )
-    #     return vectorstore.as_retriever(search_kwargs={"k": 3})
 if __name__ == "__main__":
     retriever = BioBERTRetriever(faiss_dir=r"C:\Users\PARTHA SARATHI\Python\medical_rag\information_retrieval\fasiss_container")
     results = retriever.retrieve("What are the symptoms of diabetes?", k=1)
