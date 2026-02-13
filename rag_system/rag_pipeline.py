@@ -1,8 +1,8 @@
 import os
 import json
 from groq import Groq
-from .biobertretriever import BioBERTRetriever
-from .medcptretriever import MedCPTRetriever
+from information_retrieval.retrievers.biobertretriever import BioBERTRetriever
+from information_retrieval.retrievers.medcptretriever import MedCPTRetriever
 from dotenv import load_dotenv
 load_dotenv() 
 groq_api_key = os.getenv("GROQ_API_KEY")

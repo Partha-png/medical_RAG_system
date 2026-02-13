@@ -6,7 +6,9 @@ import torch.nn.functional as F
 
 class MEDCPTEncoder:
     def __init__(self, model_name="ncbi/MedCPT-Article-Encoder", device=None):
-        self.device = "cuda"
+        # Auto-detect device: use CUDA if available, otherwise CPU
+        self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"MedCPT using device: {self.device}")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModel.from_pretrained(model_name).to(self.device)
         self.model.eval()

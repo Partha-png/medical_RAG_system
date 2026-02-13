@@ -1,9 +1,158 @@
-venv/
+# Python
+*.py[cod]
+*$py.class
+*.so
+.Python
 __pycache__/
-temp_uploads/
-faiss_container/
+*.pyc
+*.pyo
+*.pyd
 .env
-.pdf
-.txt
-.faiss
-.pkl
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Virtual environments
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Machine Learning / Data
+data/
+*.h5
+*.pkl
+*.pickle
+*.npy
+*.npz
+*.csv
+*.json
+*.xml
+
+# FAISS indices (session-specific, don't commit)
+faiss_containers/
+faiss_sessions/
+*.faiss
+*metadata.pkl
+bm25_index.pkl
+elasticsearch_documents.pkl
+
+# Uploaded documents (temp)
+temp_uploads/
+uploads/
+
+# Models (too large for git)
+models/
+checkpoints/
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# Logs
+*.log
+logs/
+*.out
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+config.ini
+
+# Streamlit
+.streamlit/
+
+# Elasticsearch
+elasticsearch-*/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# OS
+Thumbs.db
+.DS_Store
+*.bak
+*.tmp
+*~
+
+# Documentation builds
+docs/_build/
+site/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# pytype
+.pytype/
+
+# Cython
+cython_debug/
+
+# Backend cache
+backend/__pycache__/
+backend/**/__pycache__/
+information_retrieval/__pycache__/
+information_retrieval/**/__pycache__/
+rag_system/__pycache__/
+rag_system/**/__pycache__/

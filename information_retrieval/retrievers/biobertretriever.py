@@ -4,7 +4,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 import faiss
 import pickle
 import numpy as np
-from .bioBERTqueryencoder import BioBERTQueryEncoder
+from .biobertqueryencoder import BioBERTQueryEncoder
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 

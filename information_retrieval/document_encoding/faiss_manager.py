@@ -36,16 +36,18 @@ def get_or_create_faiss_index(faiss_dir: str, dim: int,model_name,file_path):
     ext=os.path.splitext(file_path)[1].lower()
     if ext=='.txt':
             with open(file_path, 'r', encoding='utf-8') as f:
-                if f.read().strip():
-                    text.append(f.read())
+                content = f.read().strip()
+                if content:
+                    text.append(content)
             
 
     elif ext=='.pdf':
             
             reader = PdfReader(file_path)
             for page in reader.pages:
-                if page.extract_text():
-                   text.append(page.extract_text())
+                page_text = page.extract_text()
+                if page_text:
+                   text.append(page_text)
     full_text = " ".join(text)
             
     num_docs=len(token_chunk(full_text,encoder.tokenizer,max_tokens=400,overlap=100))
