@@ -5,7 +5,6 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-00a393.svg)](https://fastapi.tiangolo.com)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 <p align="center">
   <img src="https://via.placeholder.com/800x400/1a1a2e/16213e?text=Medical+RAG+Demo" alt="Medical RAG Demo" />
@@ -288,26 +287,6 @@ POST /api/evaluation/rag
 - **Pydantic** - Data validation
 - **PyPDF2** - PDF processing
 
-## 🤝 Contributing
-
-Contributions are welcome! Here's how:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-**Areas for contribution:**
-- [ ] Additional retrieval methods (ColBERT, SPLADE)
-- [ ] Better evaluation metrics (BLEU, ROUGE, BERTScore)
-- [ ] Docker deployment
-- [ ] More LLM providers (OpenAI, Anthropic, local models)
-- [ ] Query rewriting/expansion
-- [ ] Multi-language support
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
 ## 📊 Performance
 
 | Metric | BioBERT | MedCPT | BM25 | Hybrid |
@@ -388,6 +367,5 @@ If you find this project useful, please consider giving it a star!
 <p align="center">
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-usage">Usage</a> •
-  <a href="#-api-usage">API</a> •
-  <a href="#-contributing">Contributing</a>
+  <a href="#-api-usage">API</a>
 </p>
