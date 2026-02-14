@@ -6,9 +6,6 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-00a393.svg)](https://fastapi.tiangolo.com)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-<p align="center">
-  <img src="https://via.placeholder.com/800x400/1a1a2e/16213e?text=Medical+RAG+Demo" alt="Medical RAG Demo" />
-</p>
 
 ## 🎯 What is This?
 
@@ -351,21 +348,6 @@ You may obtain a copy of the License at
 
 ## 📧 Contact
 
-**Your Name** - [@yourtwitter](https://twitter.com/yourtwitter)
+**Your Name** - [@yourtwitter]((https://x.com/Parthapng))
 
 Project Link: [https://github.com/yourusername/medical-rag](https://github.com/yourusername/medical-rag)
-
-## ⭐ Star History
-
-If you find this project useful, please consider giving it a star!
-
-[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/medical-rag&type=Date)](https://star-history.com/#yourusername/medical-rag&Date)
-
----
-
-<p align="center">Made with ❤️ by developers, for developers</p>
-<p align="center">
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-usage">Usage</a> •
-  <a href="#-api-usage">API</a>
-</p>
