@@ -41,7 +41,7 @@ def encode_documents(model_type, output_folder, input_file, batch_size=8, create
     Encode documents and optionally create BM25 index
     
     Args:
-        model_type: 'biobert', 'medcpt', or 'bm25'
+        model_type: 'biobert', 'medcpt', 'bm25', or 'hybrid'
         output_folder: Where to save embeddings and indices
         input_file: Input document file
         batch_size: Batch size for encoding
@@ -66,20 +66,6 @@ def encode_documents(model_type, output_folder, input_file, batch_size=8, create
         print(f"Created BM25 index with {len(documents)} documents")
         return []
     
-    # For Elasticsearch, create a simple index file (actual indexing happens in ES)
-    if model_type.lower() == 'elasticsearch':
-        for page in file_text:
-            chunks = page.split('\n\n')
-            documents.extend([c.strip() for c in chunks if c.strip()])
-        
-        # Save documents for Elasticsearch indexing
-        import pickle
-        es_index_path = os.path.join(output_folder, "elasticsearch_documents.pkl")
-        with open(es_index_path, 'wb') as f:
-            pickle.dump(documents, f)
-        print(f"Saved {len(documents)} documents for Elasticsearch indexing")
-        return []
-    
     # For Hybrid, use BioBERT as the dense component
     if model_type.lower() == 'hybrid':
         encoder = BioBERTEncoder()
@@ -91,7 +77,7 @@ def encode_documents(model_type, output_folder, input_file, batch_size=8, create
         encoder = MEDCPTEncoder()
         actual_model_type = 'medcpt'
     else:
-        raise ValueError("Unsupported model type. Choose 'biobert', 'medcpt', 'bm25', 'hybrid', or 'elasticsearch'.")
+        raise ValueError("Unsupported model type. Choose 'biobert', 'medcpt', 'bm25', or 'hybrid'.")
     
     # Chunk documents
     for page in file_text:

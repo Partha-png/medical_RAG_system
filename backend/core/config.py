@@ -40,8 +40,3 @@ CHUNK_OVERLAP = 100
 
 # Retrieval Configuration
 TOP_K_CHUNKS = 3
-
-# Elasticsearch Configuration
-ELASTICSEARCH_HOST = "localhost"
-ELASTICSEARCH_PORT = 9200
-ELASTICSEARCH_URL = f"http://{ELASTICSEARCH_HOST}:{ELASTICSEARCH_PORT}"

@@ -65,19 +65,6 @@ class DocumentService:
                     "num_chunks": 0,
                     "index_path": str(bm25_index_path)
                 }
-            elif encoder_type.lower() == 'elasticsearch':
-                # Elasticsearch creates a documents pickle file
-                es_docs_path = session_faiss_dir / "elasticsearch_documents.pkl"
-                if not es_docs_path.exists():
-                    raise DocumentProcessingError(
-                        f"Elasticsearch document save failed for session {session_id}"
-                    )
-                return {
-                    "session_id": session_id,
-                    "encoder_type": encoder_type,
-                    "num_chunks": 0,
-                    "index_path": str(es_docs_path)
-                }
             elif encoder_type.lower() == 'hybrid':
                 # Hybrid uses BioBERT FAISS + BM25
                 biobert_index_path = session_faiss_dir / "biobertindex.faiss"

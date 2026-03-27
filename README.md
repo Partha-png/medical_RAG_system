@@ -56,22 +56,13 @@ streamlit run app.py
 
 ## Retriever Options
 
-The system supports 5 retrieval methods:
+The system supports 4 retrieval methods:
 
 1. **BioBERT** - Medical domain semantic search
 2. **MedCPT** - Clinical document specialized search
 3. **BM25** - Fast keyword-based search (no GPU required)
 4. **Hybrid** - Combines BioBERT + BM25 for best results
-5. **Elasticsearch** - Requires Elasticsearch server running on localhost:9200
 
-## Note on Elasticsearch
-
-To use Elasticsearch retriever:
-1. Download and install Elasticsearch: https://www.elastic.co/downloads/elasticsearch
-2. Start Elasticsearch server on port 9200
-3. Select "elasticsearch" encoder in the UI
-
-For testing without Elasticsearch server, use **BioBERT**, **MedCPT**, **BM25**, or **Hybrid** retrievers.
 
 ## Project Structure
 
@@ -85,7 +76,7 @@ medical_rag/
 │   └── services/        # Business logic
 ├── information_retrieval/
 │   ├── document_encoding/  # Document processing
-│   └── retrievers/         # 5 retrieval implementations
+│   └── retrievers/         # 4 retrieval implementations
 ├── app.py               # Streamlit frontend
 ├── requirements.txt     # Python dependencies
 └── .env                 # Environment variables
@@ -105,4 +96,3 @@ medical_rag/
 **Import Error:** Ensure all dependencies are installed
 **CUDA Error:** System auto-detects CPU/GPU, will use CPU if no GPU available
 **Connection Error:** Ensure both backend and frontend are running
-**Elasticsearch Error:** Either install ES server or use a different retriever

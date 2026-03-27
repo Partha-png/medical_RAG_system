@@ -49,13 +49,6 @@ class RAGService:
             elif encoder_type_lower == "bm25":
                 from information_retrieval.retrievers.bm25_retriever import BM25Retriever
                 return BM25Retriever(str(faiss_dir))
-            elif encoder_type_lower == "elasticsearch":
-                from information_retrieval.retrievers.elasticsearch_retriever import ElasticsearchRetriever
-                return ElasticsearchRetriever(
-                    host=config.ELASTICSEARCH_HOST,
-                    port=config.ELASTICSEARCH_PORT,
-                    index_name=f"session_{session_id}"
-                )
             elif encoder_type_lower == "hybrid":
                 from information_retrieval.retrievers.hybrid_retriever import HybridRetriever
                 # Hybrid uses both dense and sparse, default to biobert for dense
