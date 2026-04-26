@@ -2,8 +2,6 @@ import faiss
 import pickle
 import numpy as np
 from .medcptqueryencoder import MEDCPTQueryEncoder
-from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
 
 
 class MedCPTRetriever:
