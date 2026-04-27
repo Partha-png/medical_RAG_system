@@ -3,81 +3,89 @@ File-based repository for conversation history
 """
 import json
 import os
+import tempfile
+import threading
 from datetime import datetime
 from typing import List, Dict
-from pathlib import Path
 from backend.core import config
-from backend.core.exceptions import SessionNotFound
+
+
+_write_lock = threading.Lock()
+
+
+def _atomic_write_json(path, data) -> None:
+    path = str(path)
+    directory = os.path.dirname(path) or "."
+    fd, tmp_path = tempfile.mkstemp(prefix=".tmp_", dir=directory)
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(data, f, indent=2)
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except OSError:
+                pass
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 class ConversationRepository:
     """Handles conversation persistence using JSON files"""
-    
+
     def __init__(self):
         self.conversations_dir = config.CONVERSATIONS_DIR
-    
+
     def add_message(self, session_id: str, role: str, content: str, retrieved_chunks: List[str] = None):
-        """Add a message to conversation history"""
         conversation_file = self.conversations_dir / f"{session_id}.json"
-        
-        # Load existing conversation or create new
-        if conversation_file.exists():
-            with open(conversation_file, 'r') as f:
-                conversation = json.load(f)
-        else:
-            conversation = {
-                "session_id": session_id,
-                "messages": []
+
+        with _write_lock:
+            if conversation_file.exists():
+                with open(conversation_file, "r") as f:
+                    try:
+                        conversation = json.load(f)
+                    except json.JSONDecodeError:
+                        conversation = {"session_id": session_id, "messages": []}
+            else:
+                conversation = {"session_id": session_id, "messages": []}
+
+            message = {
+                "role": role,
+                "content": content,
+                "timestamp": datetime.now().isoformat(),
+                "retrieved_chunks": retrieved_chunks,
             }
-        
-        # Add new message
-        message = {
-            "role": role,
-            "content": content,
-            "timestamp": datetime.now().isoformat(),
-            "retrieved_chunks": retrieved_chunks
-        }
-        conversation["messages"].append(message)
-        
-        # Save conversation
-        with open(conversation_file, 'w') as f:
-            json.dump(conversation, f, indent=2)
-        
+            conversation["messages"].append(message)
+
+            _atomic_write_json(conversation_file, conversation)
+
         return message
-    
+
     def get_conversation(self, session_id: str) -> Dict:
-        """Get full conversation history for a session"""
         conversation_file = self.conversations_dir / f"{session_id}.json"
-        
+
         if not conversation_file.exists():
-            return {
-                "session_id": session_id,
-                "messages": []
-            }
-        
-        with open(conversation_file, 'r') as f:
-            return json.load(f)
-    
+            return {"session_id": session_id, "messages": []}
+
+        with open(conversation_file, "r") as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                return {"session_id": session_id, "messages": []}
+
     def delete_conversation(self, session_id: str) -> bool:
-        """Delete conversation history for a session"""
         conversation_file = self.conversations_dir / f"{session_id}.json"
-        
         if conversation_file.exists():
             conversation_file.unlink()
             return True
-        
         return False
-    
+
     def clear_conversation(self, session_id: str) -> bool:
-        """Clear all messages in a conversation but keep the session"""
         conversation_file = self.conversations_dir / f"{session_id}.json"
-        
-        conversation = {
-            "session_id": session_id,
-            "messages": []
-        }
-        
-        with open(conversation_file, 'w') as f:
-            json.dump(conversation, f, indent=2)
-        
+        conversation = {"session_id": session_id, "messages": []}
+        _atomic_write_json(conversation_file, conversation)
         return True

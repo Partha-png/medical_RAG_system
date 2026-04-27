@@ -121,8 +121,3 @@ def encode_documents(model_type, output_folder, input_file, batch_size=8, create
     return all_embeddings
 
 
-if __name__ == "__main__":
-    model_name = "biobert"
-    input_folder = r"C:\Users\PARTHA SARATHI\Downloads\Untitled document (1).pdf"
-    output_folder = r"C:\Users\PARTHA SARATHI\Downloads"
-    encode_documents(model_name, output_folder, input_folder, batch_size=8)

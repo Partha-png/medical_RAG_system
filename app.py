@@ -1,165 +1,182 @@
 """
-Updated Streamlit Frontend - Uses FastAPI Backend
+Streamlit Frontend - Talks to the FastAPI Backend
 """
+import os
+import traceback
+
 import streamlit as st
 import requests
-import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # Backend API Configuration
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 st.set_page_config(page_title="Medical RAG System", page_icon="🏥", layout="wide")
 
 # Initialize session state
-if 'session_id' not in st.session_state:
+if "session_id" not in st.session_state:
     st.session_state.session_id = None
-if 'chat_history' not in st.session_state:
+if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
 st.title("🏥 Medical RAG System")
 
+
+def _show_response_error(label: str, response: requests.Response) -> None:
+    try:
+        detail = response.json().get("detail", response.text)
+    except ValueError:
+        detail = response.text
+    st.error(f"{label} ({response.status_code}): {detail}")
+
+
 # Sidebar
 with st.sidebar:
     st.header("Configuration")
-    
-    # Encoder selection
+
     encoder_type = st.selectbox(
         "📦 Encoder Model",
         ["biobert", "medcpt", "bm25", "hybrid"],
-        help="Model used to encode/index your document"
+        help="Model used to encode/index your document",
     )
-    
-    # Auto-set retriever based on encoder
-    # For BioBERT, MedCPT, BM25 → retriever = encoder
-    # For Hybrid → retriever = hybrid (uses BioBERT + BM25)
-    if encoder_type in ["biobert", "medcpt", "bm25", "hybrid"]:
-        retriever_type = encoder_type
-    else:
-        retriever_type = encoder_type
-    
-    # Show retriever (read-only display)
+
+    retriever_type = encoder_type
     st.text_input(
         "🔍 Retriever Model",
         value=retriever_type,
         disabled=True,
-        help="Automatically matches encoder selection"
+        help="Automatically matches encoder selection",
     )
-    
-    # Explanation
+
     if encoder_type == "hybrid":
         st.caption("ℹ️ Hybrid uses BioBERT encoder + BM25 for retrieval")
     elif encoder_type in ["biobert", "medcpt"]:
         st.caption(f"ℹ️ {encoder_type.upper()} used for both encoding and retrieval")
     elif encoder_type == "bm25":
         st.caption("ℹ️ BM25 is keyword-based (no neural encoding)")
-    
+
     k_chunks = st.slider("Chunks to retrieve", 1, 10, 3)
-    
-    # API Key status
+
     api_key = os.getenv("GROQ_API_KEY")
     if api_key:
         st.success("✅ API Key loaded")
     else:
-        st.error("❌ Add GROQ_API_KEY to .env")
-    
-    # Session info
+        st.error("❌ Add GROQ_API_KEY to your environment")
+
     if st.session_state.session_id:
         st.info(f"📝 Session: {st.session_state.session_id[:8]}...")
         if st.button("📊 View Session Info"):
             try:
-                response = requests.get(f"{API_BASE_URL}/api/sessions/{st.session_state.session_id}")
-                if response.status_code == 200:
-                    session_data = response.json()
-                    st.json(session_data)
-            except Exception as e:
-                st.error(f"Error: {e}")
-    
+                response = requests.get(
+                    f"{API_BASE_URL}/api/sessions/{st.session_state.session_id}",
+                    timeout=10,
+                )
+                if response.ok:
+                    st.json(response.json())
+                else:
+                    _show_response_error("Failed to load session", response)
+            except requests.RequestException as e:
+                st.error(f"Network error: {e}")
+
     if st.button("Reset Session", use_container_width=True):
         if st.session_state.session_id:
             try:
-                # Delete session on backend
-                requests.delete(f"{API_BASE_URL}/api/sessions/{st.session_state.session_id}")
-            except:
-                pass
+                resp = requests.delete(
+                    f"{API_BASE_URL}/api/sessions/{st.session_state.session_id}",
+                    timeout=10,
+                )
+                if not resp.ok and resp.status_code != 404:
+                    _show_response_error("Failed to delete session", resp)
+            except requests.RequestException as e:
+                st.warning(f"Could not reach backend to delete session: {e}")
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
 
+
 # Main tabs
-tab1, tab2, tab3, tab4 = st.tabs(["📄 Upload & Process", "💬 Chat", "📊 Session History", "🧪 Evaluation"])
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["📄 Upload & Process", "💬 Chat", "📊 Session History", "🧪 Evaluation"]
+)
 
 with tab1:
     st.header("Document Upload")
-    
+
     uploaded_file = st.file_uploader("Upload medical document", type=["pdf", "txt"])
-    
+
     if uploaded_file:
         st.info(f"**{uploaded_file.name}** - {uploaded_file.size / 1024:.2f} KB")
-        
+
         if st.button("Process Document", type="primary"):
             try:
                 with st.spinner("Creating session..."):
-                    # Step 1: Create session
                     session_response = requests.post(
                         f"{API_BASE_URL}/api/sessions",
-                        json={"encoder_type": encoder_type}
+                        json={"encoder_type": encoder_type},
+                        timeout=30,
                     )
-                    
+
                     if session_response.status_code != 201:
-                        st.error(f"Failed to create session: {session_response.text}")
+                        _show_response_error("Failed to create session", session_response)
                         st.stop()
-                    
+
                     session_data = session_response.json()
                     session_id = session_data["session_id"]
                     st.session_state.session_id = session_id
                     st.success(f"✅ Session created: {session_id[:8]}...")
-                
+
                 with st.spinner("Uploading and processing document..."):
-                    # Step 2: Upload document
-                    files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+                    files = {
+                        "file": (
+                            uploaded_file.name,
+                            uploaded_file.getvalue(),
+                            uploaded_file.type,
+                        )
+                    }
                     data = {"session_id": session_id}
-                    
+
                     upload_response = requests.post(
                         f"{API_BASE_URL}/api/documents/upload",
                         files=files,
-                        data=data
+                        data=data,
+                        timeout=600,
                     )
-                    
-                    if upload_response.status_code != 200:
-                        st.error(f"Failed to upload document: {upload_response.text}")
+
+                    if not upload_response.ok:
+                        _show_response_error("Failed to upload document", upload_response)
                         st.stop()
-                    
+
                     result = upload_response.json()
                     st.success("✅ Document processed successfully!")
-                    
-                    # Show processing details
+
                     with st.expander("Processing Details"):
                         st.write(f"**Encoder**: {encoder_type}")
                         st.write(f"**Retriever**: {retriever_type}")
-                        st.write(f"**Chunks created**: {result.get('num_chunks', 'N/A')}")
+                        st.write(f"**Embeddings**: {result.get('num_embeddings', 'N/A')}")
                         st.write(f"**Session ID**: {session_id}")
-                
+
                 st.info("👉 Go to the **Chat** tab to ask questions!")
-                
+
             except requests.exceptions.ConnectionError:
-                st.error("❌ Cannot connect to backend. Make sure FastAPI server is running on port 8000")
-                st.code("uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000")
+                st.error(
+                    f"❌ Cannot connect to backend at {API_BASE_URL}. "
+                    "Make sure the FastAPI server is running."
+                )
+            except requests.RequestException as e:
+                st.error(f"Network error: {e}")
             except Exception as e:
-                st.error(f"Error: {str(e)}")
-                import traceback
+                st.error(f"Error: {e}")
                 with st.expander("Debug Info"):
                     st.code(traceback.format_exc())
 
 with tab2:
     st.header("Ask Questions")
-    
+
     if not st.session_state.session_id:
         st.warning("⚠️ Please upload and process a document first (Upload & Process tab)")
     else:
-        # Display chat history
         for msg in st.session_state.chat_history:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
@@ -169,16 +186,13 @@ with tab2:
                             st.markdown(f"**Chunk {i}:**")
                             st.text(chunk)
                             st.divider()
-        
-        # Chat input
+
         if question := st.chat_input("Ask about your document..."):
-            # Add user message
             st.session_state.chat_history.append({"role": "user", "content": question})
-            
+
             with st.chat_message("user"):
                 st.markdown(question)
-            
-            # Get answer from backend
+
             with st.chat_message("assistant"):
                 with st.spinner("Thinking..."):
                     try:
@@ -187,203 +201,212 @@ with tab2:
                             json={
                                 "session_id": st.session_state.session_id,
                                 "question": question,
-                                "k": k_chunks
-                            }
+                                "k": k_chunks,
+                            },
+                            timeout=300,
                         )
-                        
-                        if response.status_code == 200:
+
+                        if response.ok:
                             result = response.json()
                             answer = result["answer"]
-                            chunks = result["chunks"]  # Backend returns 'chunks', not 'retrieved_chunks'
-                            
+                            chunks = result["chunks"]
+
                             st.markdown(answer)
-                            
-                            # Store assistant response
-                            st.session_state.chat_history.append({
-                                "role": "assistant",
-                                "content": answer,
-                                "chunks": chunks
-                            })
-                            
-                            # Show retrieved chunks
+
+                            st.session_state.chat_history.append(
+                                {"role": "assistant", "content": answer, "chunks": chunks}
+                            )
+
                             with st.expander("View Retrieved Chunks"):
                                 for i, chunk in enumerate(chunks, 1):
                                     st.markdown(f"**Chunk {i}:**")
                                     st.text(chunk)
                                     st.divider()
                         else:
-                            error_msg = f"Error: {response.status_code} - {response.text}"
+                            try:
+                                detail = response.json().get("detail", response.text)
+                            except ValueError:
+                                detail = response.text
+                            error_msg = f"Error {response.status_code}: {detail}"
                             st.error(error_msg)
-                            st.session_state.chat_history.append({
-                                "role": "assistant",
-                                "content": error_msg
-                            })
-                    
-                    except Exception as e:
-                        error_msg = f"Error: {str(e)}"
+                            st.session_state.chat_history.append(
+                                {"role": "assistant", "content": error_msg}
+                            )
+                    except requests.RequestException as e:
+                        error_msg = f"Network error: {e}"
                         st.error(error_msg)
-                        st.session_state.chat_history.append({
-                            "role": "assistant",
-                            "content": error_msg
-                        })
+                        st.session_state.chat_history.append(
+                            {"role": "assistant", "content": error_msg}
+                        )
 
 with tab3:
     st.header("Conversation History")
-    
+
     if st.session_state.session_id:
         try:
             response = requests.get(
-                f"{API_BASE_URL}/api/sessions/{st.session_state.session_id}/conversation"
+                f"{API_BASE_URL}/api/sessions/{st.session_state.session_id}/conversation",
+                timeout=15,
             )
-            
-            if response.status_code == 200:
+
+            if response.ok:
                 history = response.json()
-                if history["messages"]:
-                    st.write(f"**Total messages**: {len(history['messages'])}")
-                    
-                    for i, msg in enumerate(history["messages"]):
-                        with st.expander(f"Message {i+1} - {msg['role'].title()}"):
-                            st.write(f"**Question**: {msg['question']}")
-                            st.write(f"**Answer**: {msg['answer']}")
-                            st.write(f"**Timestamp**: {msg['timestamp']}")
-                            
+                messages = history.get("messages", [])
+                if messages:
+                    st.write(f"**Total messages**: {len(messages)}")
+
+                    for i, msg in enumerate(messages):
+                        with st.expander(f"Message {i + 1} - {msg.get('role', '').title()}"):
+                            st.write(f"**Role**: {msg.get('role', '')}")
+                            st.write(f"**Content**: {msg.get('content', '')}")
+                            st.write(f"**Timestamp**: {msg.get('timestamp', '')}")
+
                             if msg.get("retrieved_chunks"):
                                 st.write("**Retrieved Chunks:**")
                                 for j, chunk in enumerate(msg["retrieved_chunks"], 1):
                                     st.text(f"{j}. {chunk[:200]}...")
                 else:
                     st.info("No conversation history yet")
-                
+
                 if st.button("Clear History"):
                     delete_response = requests.delete(
-                        f"{API_BASE_URL}/api/sessions/{st.session_state.session_id}/conversation"
+                        f"{API_BASE_URL}/api/sessions/{st.session_state.session_id}/conversation",
+                        timeout=15,
                     )
-                    if delete_response.status_code == 200:
+                    # Backend returns 204 No Content on success.
+                    if delete_response.status_code in (200, 204):
                         st.success("✅ History cleared")
                         st.rerun()
+                    else:
+                        _show_response_error("Failed to clear history", delete_response)
             else:
-                st.error(f"Error fetching history: {response.text}")
-        except Exception as e:
-            st.error(f"Error: {e}")
+                _show_response_error("Error fetching history", response)
+        except requests.RequestException as e:
+            st.error(f"Network error: {e}")
     else:
         st.info("No active session")
 
 with tab4:
     st.header("📊 Evaluation Metrics")
-    st.markdown("Evaluate the quality of retrieved chunks and generated answers against reference data.")
+    st.markdown(
+        "Evaluate the quality of retrieved chunks and generated answers against reference data."
+    )
 
     eval_tab1, eval_tab2 = st.tabs(["🤖 RAG Answer Quality", "🔍 Retrieval Quality"])
 
-                    with eval_tab1:
-                        st.subheader("RAG Answer Evaluation")
-                        st.caption("Paste the generated answer and the ground truth answer to compute all metrics.")
+    with eval_tab1:
+        st.subheader("RAG Answer Evaluation")
+        st.caption(
+            "Paste the generated answer and the ground truth answer to compute all metrics."
+        )
 
-                        generated_answer = st.text_area(
-                            "Generated Answer",
-                            placeholder="Paste the answer produced by the RAG system...",
-                            height=120,
-                            key="eval_generated"
-                        )
-                        reference_answer = st.text_area(
-                            "Reference Answer (Ground Truth)",
-                            placeholder="Paste the expected correct answer...",
-                            height=120,
-                            key="eval_reference"
+        generated_answer = st.text_area(
+            "Generated Answer",
+            placeholder="Paste the answer produced by the RAG system...",
+            height=120,
+            key="eval_generated",
+        )
+        reference_answer = st.text_area(
+            "Reference Answer (Ground Truth)",
+            placeholder="Paste the expected correct answer...",
+            height=120,
+            key="eval_reference",
+        )
+
+        use_session_chunks = False
+        if st.session_state.session_id:
+            use_session_chunks = st.checkbox(
+                "Include retrieved chunks from current session",
+                value=True,
+            )
+
+        if st.button("Run Evaluation", type="primary", key="run_rag_eval"):
+            if not generated_answer.strip() or not reference_answer.strip():
+                st.warning("Please fill in both fields.")
+            else:
+                try:
+                    payload = {
+                        "generated_answer": generated_answer,
+                        "reference_answer": reference_answer,
+                    }
+                    if use_session_chunks:
+                        for msg in reversed(st.session_state.chat_history):
+                            if msg.get("role") == "assistant" and msg.get("chunks"):
+                                payload["retrieved_chunks"] = msg["chunks"]
+                                break
+
+                    with st.spinner("Evaluating..."):
+                        resp = requests.post(
+                            f"{API_BASE_URL}/api/evaluation/rag",
+                            json=payload,
+                            timeout=120,
                         )
 
-                        use_session_chunks = False
-                        if st.session_state.session_id:
-                            use_session_chunks = st.checkbox(
-                                "Include retrieved chunks from current session",
-                                value=True
+                    if resp.ok:
+                        m = resp.json()
+                        st.success("Evaluation complete!")
+
+                        if "error" in m:
+                            st.error(f"Error: {m['error']}")
+                        else:
+                            st.markdown("#### BLEU Score")
+                            st.metric("BLEU", f"{m.get('bleu_score', 0):.4f}")
+
+                            st.divider()
+
+                            st.markdown("#### ROUGE Scores")
+                            rouge_data = {
+                                "Metric": ["ROUGE-1", "ROUGE-2", "ROUGE-L"],
+                                "Precision": [
+                                    m.get("rouge1_precision", 0),
+                                    m.get("rouge2_precision", 0),
+                                    m.get("rougeL_precision", 0),
+                                ],
+                                "Recall": [
+                                    m.get("rouge1_recall", 0),
+                                    m.get("rouge2_recall", 0),
+                                    m.get("rougeL_recall", 0),
+                                ],
+                                "F1": [
+                                    m.get("rouge1_f1", 0),
+                                    m.get("rouge2_f1", 0),
+                                    m.get("rougeL_f1", 0),
+                                ],
+                            }
+                            import pandas as pd
+
+                            st.dataframe(
+                                pd.DataFrame(rouge_data)
+                                .set_index("Metric")
+                                .style.format("{:.4f}"),
+                                use_container_width=True,
                             )
 
-                        if st.button("Run Evaluation", type="primary", key="run_rag_eval"):
-                            if not generated_answer.strip() or not reference_answer.strip():
-                                st.warning("Please fill in both fields.")
-                            else:
-                                try:
-                                    payload = {
-                                        "generated_answer": generated_answer,
-                                        "reference_answer": reference_answer,
-                                    }
-                                    if use_session_chunks:
-                                        for msg in reversed(st.session_state.chat_history):
-                                            if msg.get("role") == "assistant" and msg.get("chunks"):
-                                                payload["retrieved_chunks"] = msg["chunks"]
-                                                break
+                            st.divider()
 
-                                    with st.spinner("Evaluating..."):
-                                        resp = requests.post(
-                                            f"{API_BASE_URL}/api/evaluation/rag",
-                                            json=payload
-                                        )
+                            st.markdown("#### Retrieval Metrics")
+                            c1, c2, c3 = st.columns(3)
+                            c1.metric("Precision@3", f"{m.get('precision_at_3', 0):.4f}")
+                            c2.metric("Recall@3", f"{m.get('recall_at_3', 0):.4f}")
+                            c3.metric("F1@3", f"{m.get('f1_at_3', 0):.4f}")
 
-                                    if resp.status_code == 200:
-                                        m = resp.json()
-                                        st.success("Evaluation complete!")
+                            st.divider()
 
-                                        if "error" in m:
-                                            st.error(f"Error: {m['error']}")
-                                        else:
-                                            # ── BLEU
-                                            st.markdown("#### BLEU Score")
-                                            st.metric("BLEU", f"{m.get('bleu_score', 0):.4f}")
+                            st.markdown("#### Answer Quality")
+                            c4, c5, c6, c7 = st.columns(4)
+                            c4.metric("Word Overlap", f"{m.get('word_overlap', 0):.4f}")
+                            c5.metric("Length Ratio", f"{m.get('length_ratio', 0):.4f}")
+                            c6.metric("Generated Length", m.get("generated_length", 0))
+                            c7.metric("Chunks Used", m.get("num_chunks_used", 0))
+                    else:
+                        _show_response_error("API Error", resp)
 
-                                            st.divider()
-
-                                            # ── ROUGE table
-                                            st.markdown("#### ROUGE Scores")
-                                            rouge_data = {
-                                                "Metric":    ["ROUGE-1", "ROUGE-2", "ROUGE-L"],
-                                                "Precision": [
-                                                    m.get("rouge1_precision", 0),
-                                                    m.get("rouge2_precision", 0),
-                                                    m.get("rougeL_precision", 0),
-                                                ],
-                                                "Recall": [
-                                                    m.get("rouge1_recall", 0),
-                                                    m.get("rouge2_recall", 0),
-                                                    m.get("rougeL_recall", 0),
-                                                ],
-                                                "F1": [
-                                                    m.get("rouge1_f1", 0),
-                                                    m.get("rouge2_f1", 0),
-                                                    m.get("rougeL_f1", 0),
-                                                ],
-                                            }
-                                            import pandas as pd
-                                            st.dataframe(
-                                                pd.DataFrame(rouge_data).set_index("Metric").style.format("{:.4f}"),
-                                                use_container_width=True
-                                            )
-
-                                            st.divider()
-
-                                            # ── Retrieval metrics
-                                            st.markdown("#### Retrieval Metrics")
-                                            c1, c2, c3 = st.columns(3)
-                                            c1.metric("Precision@3", f"{m.get('precision_at_3', 0):.4f}")
-                                            c2.metric("Recall@3",    f"{m.get('recall_at_3', 0):.4f}")
-                                            c3.metric("F1@3",        f"{m.get('f1_at_3', 0):.4f}")
-
-                                            st.divider()
-
-                                            # ── General metrics
-                                            st.markdown("#### Answer Quality")
-                                            c4, c5, c6, c7 = st.columns(4)
-                                            c4.metric("Word Overlap",    f"{m.get('word_overlap', 0):.4f}")
-                                            c5.metric("Length Ratio",    f"{m.get('length_ratio', 0):.4f}")
-                                            c6.metric("Generated Length", m.get('generated_length', 0))
-                                            c7.metric("Chunks Used",      m.get('num_chunks_used', 0))
-
-                                    else:
-                                        st.error(f"API Error {resp.status_code}: {resp.text}")
-
-                                except requests.exceptions.ConnectionError:
-                                    st.error("Cannot connect to backend.")
-                                except Exception as e:
-                                    st.error(f"Error: {e}")
+                except requests.exceptions.ConnectionError:
+                    st.error(f"Cannot connect to backend at {API_BASE_URL}.")
+                except requests.RequestException as e:
+                    st.error(f"Network error: {e}")
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
     with eval_tab2:
         st.subheader("Retrieval Quality Evaluation (Precision / Recall / F1)")
@@ -398,19 +421,19 @@ with tab4:
                 "Retrieved Documents (one per line)",
                 placeholder="chunk_1\nchunk_2\nchunk_3",
                 height=160,
-                key="eval_retrieved"
+                key="eval_retrieved",
             )
         with col_b:
             relevant_raw = st.text_area(
                 "Relevant Documents – Ground Truth (one per line)",
                 placeholder="chunk_1\nchunk_4",
                 height=160,
-                key="eval_relevant"
+                key="eval_relevant",
             )
 
         if st.button("▶ Run Retrieval Evaluation", type="primary", key="run_ret_eval"):
             retrieved_list = [d.strip() for d in retrieved_raw.strip().splitlines() if d.strip()]
-            relevant_list  = [d.strip() for d in relevant_raw.strip().splitlines()  if d.strip()]
+            relevant_list = [d.strip() for d in relevant_raw.strip().splitlines() if d.strip()]
 
             if not retrieved_list or not relevant_list:
                 st.warning("⚠️ Please provide at least one entry in each field.")
@@ -423,10 +446,11 @@ with tab4:
                     with st.spinner("Evaluating..."):
                         resp = requests.post(
                             f"{API_BASE_URL}/api/evaluation/retrieval",
-                            json=payload
+                            json=payload,
+                            timeout=60,
                         )
 
-                    if resp.status_code == 200:
+                    if resp.ok:
                         metrics = resp.json()
                         st.success("✅ Evaluation complete!")
                         if "error" in metrics:
@@ -434,8 +458,8 @@ with tab4:
                         else:
                             m_cols = st.columns(3)
                             m_cols[0].metric("Precision", f"{metrics.get('precision', 0):.4f}")
-                            m_cols[1].metric("Recall",    f"{metrics.get('recall', 0):.4f}")
-                            m_cols[2].metric("F1 Score",  f"{metrics.get('f1', 0):.4f}")
+                            m_cols[1].metric("Recall", f"{metrics.get('recall', 0):.4f}")
+                            m_cols[2].metric("F1 Score", f"{metrics.get('f1', 0):.4f}")
 
                             st.divider()
                             info_cols = st.columns(3)
@@ -446,9 +470,11 @@ with tab4:
                             with st.expander("Raw JSON"):
                                 st.json(metrics)
                     else:
-                        st.error(f"API Error {resp.status_code}: {resp.text}")
+                        _show_response_error("API Error", resp)
                 except requests.exceptions.ConnectionError:
-                    st.error("❌ Cannot connect to backend (port 8000). Make sure FastAPI is running.")
+                    st.error(f"❌ Cannot connect to backend at {API_BASE_URL}.")
+                except requests.RequestException as e:
+                    st.error(f"Network error: {e}")
                 except Exception as e:
                     st.error(f"Unexpected error: {e}")
 
@@ -463,6 +489,6 @@ with col3:
     st.caption(f"📊 Chunks: **{k_chunks}**")
 with col4:
     if st.session_state.session_id:
-        st.caption(f"📝 Session: **Active**")
+        st.caption("📝 Session: **Active**")
     else:
         st.caption("📝 Session: **None**")

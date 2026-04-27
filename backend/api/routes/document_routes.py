@@ -2,8 +2,11 @@
 API routes for document upload and processing
 """
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
+
 from backend.services.document_service import DocumentService
 from backend.services.session_service import SessionService
+from backend.services.rag_service import RAGService
 from backend.core.exceptions import DocumentProcessingError, SessionNotFound
 
 router = APIRouter(prefix="/api/documents", tags=["Documents"])
@@ -14,75 +17,83 @@ session_service = SessionService()
 @router.post("/upload")
 async def upload_document(
     session_id: str = Form(...),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
 ):
-    """
-    Upload and process a document for a session
-    """
+    """Upload and process a document for a session."""
+    file_path = None
     try:
-        # Verify session exists
         session = session_service.get_session(session_id)
-        
-        # Validate file type
+
         allowed_extensions = {".pdf", ".txt"}
-        file_ext = "." + file.filename.split(".")[-1].lower() if "." in file.filename else ""
-        
+        original_name = file.filename or ""
+        file_ext = "." + original_name.split(".")[-1].lower() if "." in original_name else ""
+
         if file_ext not in allowed_extensions:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File type {file_ext} not supported. Allowed: {allowed_extensions}"
+                detail=f"File type {file_ext} not supported. Allowed: {sorted(allowed_extensions)}",
             )
-        
-        # Save uploaded file
+
         file_content = await file.read()
-        file_path = document_service.save_uploaded_file(file_content, file.filename)
-        
-        # Process document
-        result = document_service.process_document(
-            file_path=file_path,
-            session_id=session_id,
-            encoder_type=session.encoder_type,
-            batch_size=8
+        file_path = await run_in_threadpool(
+            document_service.save_uploaded_file, file_content, original_name
         )
-        
-        # Update session with document name
-        session_service.update_document_name(session_id, file.filename)
-        
+
+        result = await run_in_threadpool(
+            document_service.process_document,
+            file_path,
+            session_id,
+            session.encoder_type,
+            8,
+        )
+
+        await run_in_threadpool(
+            session_service.update_document_name, session_id, original_name
+        )
+
+        # New index data on disk -> drop any stale cached retriever.
+        RAGService.invalidate_session_cache(session_id)
+
         return {
             "message": "Document processed successfully",
             "session_id": session_id,
-            "filename": file.filename,
+            "filename": original_name,
             "encoder_type": session.encoder_type,
-            "num_embeddings": result.get("num_embeddings", 0)
+            "num_embeddings": result.get("num_embeddings", 0),
         }
-        
+
     except SessionNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Session {session_id} not found"
+            detail=f"Session {session_id} not found",
         )
     except DocumentProcessingError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(e)
+            detail=str(e),
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Document upload failed: {str(e)}"
+            detail=f"Document upload failed: {str(e)}",
         )
+    finally:
+        # Don't let temp files pile up.
+        if file_path:
+            document_service.cleanup_temp_file(file_path)
 
 
 @router.delete("/{session_id}")
 async def delete_document(session_id: str):
-    """
-    Delete all documents and FAISS indices for a session
-    """
+    """Delete all documents and FAISS indices for a session."""
     try:
-        document_service.delete_session_data(session_id)
+        await run_in_threadpool(document_service.delete_session_data, session_id)
+        RAGService.invalidate_session_cache(session_id)
         return {"message": f"Documents deleted for session {session_id}"}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete documents: {str(e)}"
+            detail=f"Failed to delete documents: {str(e)}",
         )
