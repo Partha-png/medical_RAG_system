@@ -25,8 +25,8 @@ async def query(request: QueryRequest):
         session = session_service.get_session(request.session_id)
 
         # Heavy work goes to a thread so we don't block the event loop.
-        answer, chunks = await run_in_threadpool(
-            rag_service.query,
+        answer, chunks, timings = await run_in_threadpool(
+            rag_service.query_with_timings,
             request.session_id,
             session.encoder_type,
             request.question,
@@ -40,6 +40,9 @@ async def query(request: QueryRequest):
             answer,
             chunks,
         )
+        if isinstance(metrics, dict):
+            metrics["latency"] = timings
+            metrics["encoder"] = session.encoder_type
 
         await run_in_threadpool(
             conversation_service.add_message,

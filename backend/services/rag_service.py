@@ -141,6 +141,29 @@ ANSWER:"""
         answer = self.generate_answer(question, chunks)
         return answer, chunks
 
+    def query_with_timings(
+        self,
+        session_id: str,
+        encoder_type: str,
+        question: str,
+        k: int = 3,
+    ) -> Tuple[str, List[str], Dict[str, float]]:
+        """Full RAG query plus per-stage latency in milliseconds."""
+        import time
+
+        t0 = time.perf_counter()
+        chunks = self.retrieve_chunks(session_id, encoder_type, question, k)
+        t1 = time.perf_counter()
+        answer = self.generate_answer(question, chunks)
+        t2 = time.perf_counter()
+
+        timings = {
+            "retrieval_ms": round((t1 - t0) * 1000, 2),
+            "generation_ms": round((t2 - t1) * 1000, 2),
+            "total_ms": round((t2 - t0) * 1000, 2),
+        }
+        return answer, chunks, timings
+
     def _format_chunks(self, chunks: List[str]) -> str:
         formatted = []
         for idx, chunk in enumerate(chunks, 1):

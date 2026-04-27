@@ -20,6 +20,8 @@ if "session_id" not in st.session_state:
     st.session_state.session_id = None
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+if "comparison_rows" not in st.session_state:
+    st.session_state.comparison_rows = []
 
 st.title("🏥 Medical RAG System")
 
@@ -41,7 +43,18 @@ _METRIC_HELP = {
     "faithfulness":        "Fraction of the answer's content words that appear in the retrieved chunks.",
     "answer_relevance":    "Overlap between the question and the answer.",
     "context_utilization": "Fraction of retrieved chunks that meaningfully contributed to the answer.",
+    "retrieval_ms":        "Time spent fetching the top-k chunks from the index.",
+    "generation_ms":       "Time the LLM took to generate the answer.",
+    "total_ms":            "Total wall-clock time for retrieval + generation.",
 }
+
+
+def _fmt_ms(ms: float) -> str:
+    if ms is None:
+        return "—"
+    if ms < 1000:
+        return f"{ms:.0f} ms"
+    return f"{ms / 1000:.2f} s"
 
 
 def _quality_label(score: float) -> str:
@@ -119,6 +132,26 @@ def _render_metrics(metrics: dict, use_expander: bool = True) -> None:
             help=_METRIC_HELP["context_utilization"],
         )
 
+        latency = metrics.get("latency") or {}
+        if latency:
+            st.markdown("##### Latency")
+            l1, l2, l3 = st.columns(3)
+            l1.metric(
+                "Retrieval",
+                _fmt_ms(latency.get("retrieval_ms")),
+                help=_METRIC_HELP["retrieval_ms"],
+            )
+            l2.metric(
+                "Generation",
+                _fmt_ms(latency.get("generation_ms")),
+                help=_METRIC_HELP["generation_ms"],
+            )
+            l3.metric(
+                "Total",
+                _fmt_ms(latency.get("total_ms")),
+                help=_METRIC_HELP["total_ms"],
+            )
+
         if counts:
             st.caption(
                 f"chunks: {counts.get('num_chunks', 0)}  ·  "
@@ -194,7 +227,12 @@ with st.sidebar:
 
 # ----- main tabs --------------------------------------------------------------
 
-tab1, tab2, tab3 = st.tabs(["📄 Upload & Process", "💬 Chat", "📊 Session History"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📄 Upload & Process",
+    "💬 Chat",
+    "📊 Session History",
+    "🆚 Model Comparison",
+])
 
 with tab1:
     st.header("Document Upload")
@@ -321,6 +359,29 @@ with tab2:
                                 }
                             )
 
+                            # Log this run into the comparison table.
+                            if metrics and "error" not in metrics:
+                                from datetime import datetime as _dt
+                                retrieval = metrics.get("retrieval", {})
+                                ans_m = metrics.get("answer", {})
+                                lat = metrics.get("latency", {})
+                                st.session_state.comparison_rows.append({
+                                    "Time": _dt.now().strftime("%H:%M:%S"),
+                                    "Question": question,
+                                    "Encoder": metrics.get("encoder", encoder_type),
+                                    "k": k_chunks,
+                                    "Faithfulness": ans_m.get("faithfulness"),
+                                    "Top Chunk Rel.": retrieval.get("top_chunk_relevance"),
+                                    "Context Rel.": retrieval.get("context_relevance"),
+                                    "Diversity": retrieval.get("diversity"),
+                                    "Answer Rel.": ans_m.get("answer_relevance"),
+                                    "Ctx Util.": ans_m.get("context_utilization"),
+                                    "Retrieval (ms)": lat.get("retrieval_ms"),
+                                    "Generation (ms)": lat.get("generation_ms"),
+                                    "Total (ms)": lat.get("total_ms"),
+                                    "Answer": (answer[:120] + "…") if len(answer) > 120 else answer,
+                                })
+
                             with st.expander("View Retrieved Chunks"):
                                 for i, chunk in enumerate(chunks, 1):
                                     st.markdown(f"**Chunk {i}:**")
@@ -396,6 +457,66 @@ with tab3:
             st.error(f"Network error: {e}")
     else:
         st.info("No active session")
+
+with tab4:
+    st.header("Model Comparison")
+    st.caption(
+        "Every query you run is logged here as a row. "
+        "To compare encoders/retrievers, ask the **same question**, then change the "
+        "encoder in the sidebar and ask it again — each run appears side-by-side."
+    )
+
+    rows = st.session_state.comparison_rows
+
+    if not rows:
+        st.info("No runs yet. Ask a question in the Chat tab — it'll show up here.")
+    else:
+        col_a, col_b, col_c = st.columns([2, 1, 1])
+        with col_a:
+            questions = ["(all)"] + sorted({r["Question"] for r in rows})
+            selected_q = st.selectbox("Filter by question", questions, index=0)
+        with col_b:
+            group_mode = st.checkbox("Group by question", value=True)
+        with col_c:
+            if st.button("🗑 Clear table", use_container_width=True):
+                st.session_state.comparison_rows = []
+                st.rerun()
+
+        filtered = rows if selected_q == "(all)" else [r for r in rows if r["Question"] == selected_q]
+
+        try:
+            import pandas as pd
+            df = pd.DataFrame(filtered)
+            if group_mode and "Question" in df.columns:
+                df = df.sort_values(by=["Question", "Time"]).reset_index(drop=True)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+
+            csv = df.to_csv(index=False).encode("utf-8")
+            st.download_button(
+                "⬇️ Download as CSV",
+                csv,
+                file_name="model_comparison.csv",
+                mime="text/csv",
+            )
+        except ImportError:
+            # Fall back to Streamlit's built-in renderer if pandas is missing.
+            st.dataframe(filtered, use_container_width=True, hide_index=True)
+
+        # Per-question best-encoder summary
+        if group_mode and len(filtered) >= 2:
+            st.markdown("##### Best encoder per question (by Faithfulness)")
+            try:
+                import pandas as pd
+                summary_df = pd.DataFrame(filtered)
+                summary_df["Faithfulness"] = pd.to_numeric(summary_df["Faithfulness"], errors="coerce")
+                idx = summary_df.groupby("Question")["Faithfulness"].idxmax().dropna()
+                best = summary_df.loc[idx, [
+                    "Question", "Encoder", "Faithfulness",
+                    "Top Chunk Rel.", "Context Rel.", "Total (ms)",
+                ]].reset_index(drop=True)
+                st.dataframe(best, use_container_width=True, hide_index=True)
+            except Exception:
+                pass
 
 
 # Footer
