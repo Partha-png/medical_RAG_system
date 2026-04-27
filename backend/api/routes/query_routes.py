@@ -8,28 +8,37 @@ from backend.models.conversation_models import QueryRequest, QueryResponse, Conv
 from backend.services.rag_service import RAGService
 from backend.services.session_service import SessionService
 from backend.services.conversation_service import ConversationService
+from backend.services.evaluation_service import EvaluationService
 from backend.core.exceptions import SessionNotFound, RetrievalError, LLMError
 
 router = APIRouter(prefix="/api", tags=["Query"])
 rag_service = RAGService()
 session_service = SessionService()
 conversation_service = ConversationService()
+evaluation_service = EvaluationService()
 
 
 @router.post("/query", response_model=QueryResponse)
 async def query(request: QueryRequest):
-    """Process a RAG query: retrieve chunks and generate answer."""
+    """Process a RAG query: retrieve, generate, and auto-evaluate."""
     try:
         session = session_service.get_session(request.session_id)
 
-        # Heavy work (model encoding, FAISS search, LLM HTTP call) goes to a
-        # thread so we don't block the FastAPI event loop.
+        # Heavy work goes to a thread so we don't block the event loop.
         answer, chunks = await run_in_threadpool(
             rag_service.query,
             request.session_id,
             session.encoder_type,
             request.question,
             request.k,
+        )
+
+        # Reference-free quality metrics for this turn.
+        metrics = await run_in_threadpool(
+            evaluation_service.auto_evaluate,
+            request.question,
+            answer,
+            chunks,
         )
 
         await run_in_threadpool(
@@ -44,6 +53,7 @@ async def query(request: QueryRequest):
             "assistant",
             answer,
             chunks,
+            metrics,
         )
 
         return QueryResponse(
@@ -51,6 +61,7 @@ async def query(request: QueryRequest):
             question=request.question,
             answer=answer,
             chunks=chunks,
+            metrics=metrics,
         )
 
     except SessionNotFound:

@@ -6,7 +6,7 @@ import os
 import tempfile
 import threading
 from datetime import datetime
-from typing import List, Dict
+from typing import Any, Dict, List, Optional
 from backend.core import config
 
 
@@ -40,7 +40,14 @@ class ConversationRepository:
     def __init__(self):
         self.conversations_dir = config.CONVERSATIONS_DIR
 
-    def add_message(self, session_id: str, role: str, content: str, retrieved_chunks: List[str] = None):
+    def add_message(
+        self,
+        session_id: str,
+        role: str,
+        content: str,
+        retrieved_chunks: Optional[List[str]] = None,
+        metrics: Optional[Dict[str, Any]] = None,
+    ):
         conversation_file = self.conversations_dir / f"{session_id}.json"
 
         with _write_lock:
@@ -58,6 +65,7 @@ class ConversationRepository:
                 "content": content,
                 "timestamp": datetime.now().isoformat(),
                 "retrieved_chunks": retrieved_chunks,
+                "metrics": metrics,
             }
             conversation["messages"].append(message)
 

@@ -24,6 +24,8 @@ if "chat_history" not in st.session_state:
 st.title("🏥 Medical RAG System")
 
 
+# ----- helpers -----------------------------------------------------------------
+
 def _show_response_error(label: str, response: requests.Response) -> None:
     try:
         detail = response.json().get("detail", response.text)
@@ -32,7 +34,90 @@ def _show_response_error(label: str, response: requests.Response) -> None:
     st.error(f"{label} ({response.status_code}): {detail}")
 
 
-# Sidebar
+_METRIC_HELP = {
+    "context_relevance":   "How much of the question's content the retrieved chunks cover, on average.",
+    "top_chunk_relevance": "Coverage of the question by the single best chunk.",
+    "diversity":           "How non-redundant the retrieved chunks are (1.0 = all distinct).",
+    "faithfulness":        "Fraction of the answer's content words that appear in the retrieved chunks.",
+    "answer_relevance":    "Overlap between the question and the answer.",
+    "context_utilization": "Fraction of retrieved chunks that meaningfully contributed to the answer.",
+}
+
+
+def _quality_label(score: float) -> str:
+    if score >= 0.66:
+        return "🟢 Strong"
+    if score >= 0.33:
+        return "🟡 Moderate"
+    return "🔴 Weak"
+
+
+def _render_metrics(metrics: dict) -> None:
+    """Render the auto-evaluation metrics for one assistant turn."""
+    if not metrics or "error" in metrics:
+        if metrics and "error" in metrics:
+            st.caption(f"Could not compute quality metrics: {metrics['error']}")
+        return
+
+    retrieval = metrics.get("retrieval", {})
+    answer = metrics.get("answer", {})
+    counts = metrics.get("counts", {})
+
+    # Overall headline scores
+    retr_avg = sum(retrieval.values()) / len(retrieval) if retrieval else 0.0
+    ans_avg = sum(answer.values()) / len(answer) if answer else 0.0
+
+    with st.expander(
+        f"📈 Quality — Retrieval {_quality_label(retr_avg)} ({retr_avg:.2f})  ·  "
+        f"Answer {_quality_label(ans_avg)} ({ans_avg:.2f})",
+        expanded=False,
+    ):
+        st.markdown("##### Retrieval Quality")
+        c1, c2, c3 = st.columns(3)
+        c1.metric(
+            "Context Relevance",
+            f"{retrieval.get('context_relevance', 0):.2f}",
+            help=_METRIC_HELP["context_relevance"],
+        )
+        c2.metric(
+            "Top Chunk Relevance",
+            f"{retrieval.get('top_chunk_relevance', 0):.2f}",
+            help=_METRIC_HELP["top_chunk_relevance"],
+        )
+        c3.metric(
+            "Diversity",
+            f"{retrieval.get('diversity', 0):.2f}",
+            help=_METRIC_HELP["diversity"],
+        )
+
+        st.markdown("##### Answer Quality")
+        c4, c5, c6 = st.columns(3)
+        c4.metric(
+            "Faithfulness",
+            f"{answer.get('faithfulness', 0):.2f}",
+            help=_METRIC_HELP["faithfulness"],
+        )
+        c5.metric(
+            "Answer Relevance",
+            f"{answer.get('answer_relevance', 0):.2f}",
+            help=_METRIC_HELP["answer_relevance"],
+        )
+        c6.metric(
+            "Context Utilization",
+            f"{answer.get('context_utilization', 0):.2f}",
+            help=_METRIC_HELP["context_utilization"],
+        )
+
+        if counts:
+            st.caption(
+                f"chunks: {counts.get('num_chunks', 0)}  ·  "
+                f"answer words: {counts.get('answer_words', 0)}  ·  "
+                f"question words: {counts.get('question_words', 0)}"
+            )
+
+
+# ----- sidebar ----------------------------------------------------------------
+
 with st.sidebar:
     st.header("Configuration")
 
@@ -96,10 +181,9 @@ with st.sidebar:
         st.rerun()
 
 
-# Main tabs
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["📄 Upload & Process", "💬 Chat", "📊 Session History", "🧪 Evaluation"]
-)
+# ----- main tabs --------------------------------------------------------------
+
+tab1, tab2, tab3 = st.tabs(["📄 Upload & Process", "💬 Chat", "📊 Session History"])
 
 with tab1:
     st.header("Document Upload")
@@ -177,6 +261,7 @@ with tab2:
     if not st.session_state.session_id:
         st.warning("⚠️ Please upload and process a document first (Upload & Process tab)")
     else:
+        # Render existing history
         for msg in st.session_state.chat_history:
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
@@ -186,6 +271,8 @@ with tab2:
                             st.markdown(f"**Chunk {i}:**")
                             st.text(chunk)
                             st.divider()
+                if "metrics" in msg and msg["metrics"]:
+                    _render_metrics(msg["metrics"])
 
         if question := st.chat_input("Ask about your document..."):
             st.session_state.chat_history.append({"role": "user", "content": question})
@@ -210,11 +297,17 @@ with tab2:
                             result = response.json()
                             answer = result["answer"]
                             chunks = result["chunks"]
+                            metrics = result.get("metrics")
 
                             st.markdown(answer)
 
                             st.session_state.chat_history.append(
-                                {"role": "assistant", "content": answer, "chunks": chunks}
+                                {
+                                    "role": "assistant",
+                                    "content": answer,
+                                    "chunks": chunks,
+                                    "metrics": metrics,
+                                }
                             )
 
                             with st.expander("View Retrieved Chunks"):
@@ -222,6 +315,9 @@ with tab2:
                                     st.markdown(f"**Chunk {i}:**")
                                     st.text(chunk)
                                     st.divider()
+
+                            if metrics:
+                                _render_metrics(metrics)
                         else:
                             try:
                                 detail = response.json().get("detail", response.text)
@@ -265,6 +361,10 @@ with tab3:
                                 st.write("**Retrieved Chunks:**")
                                 for j, chunk in enumerate(msg["retrieved_chunks"], 1):
                                     st.text(f"{j}. {chunk[:200]}...")
+
+                            if msg.get("metrics"):
+                                st.write("**Quality Metrics:**")
+                                _render_metrics(msg["metrics"])
                 else:
                     st.info("No conversation history yet")
 
@@ -286,197 +386,6 @@ with tab3:
     else:
         st.info("No active session")
 
-with tab4:
-    st.header("📊 Evaluation Metrics")
-    st.markdown(
-        "Evaluate the quality of retrieved chunks and generated answers against reference data."
-    )
-
-    eval_tab1, eval_tab2 = st.tabs(["🤖 RAG Answer Quality", "🔍 Retrieval Quality"])
-
-    with eval_tab1:
-        st.subheader("RAG Answer Evaluation")
-        st.caption(
-            "Paste the generated answer and the ground truth answer to compute all metrics."
-        )
-
-        generated_answer = st.text_area(
-            "Generated Answer",
-            placeholder="Paste the answer produced by the RAG system...",
-            height=120,
-            key="eval_generated",
-        )
-        reference_answer = st.text_area(
-            "Reference Answer (Ground Truth)",
-            placeholder="Paste the expected correct answer...",
-            height=120,
-            key="eval_reference",
-        )
-
-        use_session_chunks = False
-        if st.session_state.session_id:
-            use_session_chunks = st.checkbox(
-                "Include retrieved chunks from current session",
-                value=True,
-            )
-
-        if st.button("Run Evaluation", type="primary", key="run_rag_eval"):
-            if not generated_answer.strip() or not reference_answer.strip():
-                st.warning("Please fill in both fields.")
-            else:
-                try:
-                    payload = {
-                        "generated_answer": generated_answer,
-                        "reference_answer": reference_answer,
-                    }
-                    if use_session_chunks:
-                        for msg in reversed(st.session_state.chat_history):
-                            if msg.get("role") == "assistant" and msg.get("chunks"):
-                                payload["retrieved_chunks"] = msg["chunks"]
-                                break
-
-                    with st.spinner("Evaluating..."):
-                        resp = requests.post(
-                            f"{API_BASE_URL}/api/evaluation/rag",
-                            json=payload,
-                            timeout=120,
-                        )
-
-                    if resp.ok:
-                        m = resp.json()
-                        st.success("Evaluation complete!")
-
-                        if "error" in m:
-                            st.error(f"Error: {m['error']}")
-                        else:
-                            st.markdown("#### BLEU Score")
-                            st.metric("BLEU", f"{m.get('bleu_score', 0):.4f}")
-
-                            st.divider()
-
-                            st.markdown("#### ROUGE Scores")
-                            rouge_data = {
-                                "Metric": ["ROUGE-1", "ROUGE-2", "ROUGE-L"],
-                                "Precision": [
-                                    m.get("rouge1_precision", 0),
-                                    m.get("rouge2_precision", 0),
-                                    m.get("rougeL_precision", 0),
-                                ],
-                                "Recall": [
-                                    m.get("rouge1_recall", 0),
-                                    m.get("rouge2_recall", 0),
-                                    m.get("rougeL_recall", 0),
-                                ],
-                                "F1": [
-                                    m.get("rouge1_f1", 0),
-                                    m.get("rouge2_f1", 0),
-                                    m.get("rougeL_f1", 0),
-                                ],
-                            }
-                            import pandas as pd
-
-                            st.dataframe(
-                                pd.DataFrame(rouge_data)
-                                .set_index("Metric")
-                                .style.format("{:.4f}"),
-                                use_container_width=True,
-                            )
-
-                            st.divider()
-
-                            st.markdown("#### Retrieval Metrics")
-                            c1, c2, c3 = st.columns(3)
-                            c1.metric("Precision@3", f"{m.get('precision_at_3', 0):.4f}")
-                            c2.metric("Recall@3", f"{m.get('recall_at_3', 0):.4f}")
-                            c3.metric("F1@3", f"{m.get('f1_at_3', 0):.4f}")
-
-                            st.divider()
-
-                            st.markdown("#### Answer Quality")
-                            c4, c5, c6, c7 = st.columns(4)
-                            c4.metric("Word Overlap", f"{m.get('word_overlap', 0):.4f}")
-                            c5.metric("Length Ratio", f"{m.get('length_ratio', 0):.4f}")
-                            c6.metric("Generated Length", m.get("generated_length", 0))
-                            c7.metric("Chunks Used", m.get("num_chunks_used", 0))
-                    else:
-                        _show_response_error("API Error", resp)
-
-                except requests.exceptions.ConnectionError:
-                    st.error(f"Cannot connect to backend at {API_BASE_URL}.")
-                except requests.RequestException as e:
-                    st.error(f"Network error: {e}")
-                except Exception as e:
-                    st.error(f"Error: {e}")
-
-    with eval_tab2:
-        st.subheader("Retrieval Quality Evaluation (Precision / Recall / F1)")
-        st.caption(
-            "Provide a list of retrieved document IDs/snippets and a list of truly relevant ones "
-            "to compute Precision, Recall, and F1."
-        )
-
-        col_a, col_b = st.columns(2)
-        with col_a:
-            retrieved_raw = st.text_area(
-                "Retrieved Documents (one per line)",
-                placeholder="chunk_1\nchunk_2\nchunk_3",
-                height=160,
-                key="eval_retrieved",
-            )
-        with col_b:
-            relevant_raw = st.text_area(
-                "Relevant Documents – Ground Truth (one per line)",
-                placeholder="chunk_1\nchunk_4",
-                height=160,
-                key="eval_relevant",
-            )
-
-        if st.button("▶ Run Retrieval Evaluation", type="primary", key="run_ret_eval"):
-            retrieved_list = [d.strip() for d in retrieved_raw.strip().splitlines() if d.strip()]
-            relevant_list = [d.strip() for d in relevant_raw.strip().splitlines() if d.strip()]
-
-            if not retrieved_list or not relevant_list:
-                st.warning("⚠️ Please provide at least one entry in each field.")
-            else:
-                try:
-                    payload = {
-                        "retrieved_docs": retrieved_list,
-                        "relevant_docs": relevant_list,
-                    }
-                    with st.spinner("Evaluating..."):
-                        resp = requests.post(
-                            f"{API_BASE_URL}/api/evaluation/retrieval",
-                            json=payload,
-                            timeout=60,
-                        )
-
-                    if resp.ok:
-                        metrics = resp.json()
-                        st.success("✅ Evaluation complete!")
-                        if "error" in metrics:
-                            st.error(f"Backend error: {metrics['error']}")
-                        else:
-                            m_cols = st.columns(3)
-                            m_cols[0].metric("Precision", f"{metrics.get('precision', 0):.4f}")
-                            m_cols[1].metric("Recall", f"{metrics.get('recall', 0):.4f}")
-                            m_cols[2].metric("F1 Score", f"{metrics.get('f1', 0):.4f}")
-
-                            st.divider()
-                            info_cols = st.columns(3)
-                            info_cols[0].info(f"🗂 Retrieved: **{metrics.get('num_retrieved', 0)}**")
-                            info_cols[1].info(f"✅ Relevant: **{metrics.get('num_relevant', 0)}**")
-                            info_cols[2].info(f"🎯 Correct: **{metrics.get('num_correct', 0)}**")
-
-                            with st.expander("Raw JSON"):
-                                st.json(metrics)
-                    else:
-                        _show_response_error("API Error", resp)
-                except requests.exceptions.ConnectionError:
-                    st.error(f"❌ Cannot connect to backend at {API_BASE_URL}.")
-                except requests.RequestException as e:
-                    st.error(f"Network error: {e}")
-                except Exception as e:
-                    st.error(f"Unexpected error: {e}")
 
 # Footer
 st.divider()
