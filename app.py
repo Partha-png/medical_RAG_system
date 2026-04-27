@@ -52,8 +52,13 @@ def _quality_label(score: float) -> str:
     return "🔴 Weak"
 
 
-def _render_metrics(metrics: dict) -> None:
-    """Render the auto-evaluation metrics for one assistant turn."""
+def _render_metrics(metrics: dict, use_expander: bool = True) -> None:
+    """Render the auto-evaluation metrics for one assistant turn.
+
+    If `use_expander` is False, draws inline (used inside the History tab,
+    where the surrounding message is already inside an expander -- Streamlit
+    forbids nested expanders).
+    """
     if not metrics or "error" in metrics:
         if metrics and "error" in metrics:
             st.caption(f"Could not compute quality metrics: {metrics['error']}")
@@ -63,15 +68,21 @@ def _render_metrics(metrics: dict) -> None:
     answer = metrics.get("answer", {})
     counts = metrics.get("counts", {})
 
-    # Overall headline scores
     retr_avg = sum(retrieval.values()) / len(retrieval) if retrieval else 0.0
     ans_avg = sum(answer.values()) / len(answer) if answer else 0.0
 
-    with st.expander(
+    header = (
         f"📈 Quality — Retrieval {_quality_label(retr_avg)} ({retr_avg:.2f})  ·  "
-        f"Answer {_quality_label(ans_avg)} ({ans_avg:.2f})",
-        expanded=False,
-    ):
+        f"Answer {_quality_label(ans_avg)} ({ans_avg:.2f})"
+    )
+
+    if use_expander:
+        container = st.expander(header, expanded=False)
+    else:
+        st.markdown(f"**{header}**")
+        container = st.container()
+
+    with container:
         st.markdown("##### Retrieval Quality")
         c1, c2, c3 = st.columns(3)
         c1.metric(
@@ -364,7 +375,7 @@ with tab3:
 
                             if msg.get("metrics"):
                                 st.write("**Quality Metrics:**")
-                                _render_metrics(msg["metrics"])
+                                _render_metrics(msg["metrics"], use_expander=False)
                 else:
                     st.info("No conversation history yet")
 
