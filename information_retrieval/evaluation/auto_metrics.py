@@ -5,18 +5,7 @@ Computes lightweight quality indicators that do NOT require a ground-truth
 answer or a relevance-judged document set. Suitable for surfacing alongside
 every generated answer in production.
 
-Three retrieval metrics + three answer metrics are returned, each in [0, 1]
-where higher is better.
-
-Retrieval:
-  - context_relevance     : mean overlap between question content and each chunk
-  - top_chunk_relevance   : best chunk-to-question overlap
-  - diversity             : 1 - mean pairwise overlap between retrieved chunks
-
-Answer:
-  - faithfulness          : fraction of answer content words supported by chunks
-  - answer_relevance      : overlap between question and answer content
-  - context_utilization   : fraction of chunks that meaningfully contribute
+All scores are in [0, 1]; for hallucination_rate, lower is better.
 """
 from typing import Dict, List, Set
 import re
@@ -24,7 +13,6 @@ import re
 
 _TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z\-]+")
 
-# Small inline stopword list -- avoids an nltk download at runtime.
 _STOPWORDS: Set[str] = {
     "the", "a", "an", "is", "are", "was", "were", "be", "been", "being", "am",
     "of", "for", "to", "in", "on", "at", "by", "with", "as", "and", "or", "but",
@@ -58,7 +46,6 @@ def _jaccard(a: Set[str], b: Set[str]) -> float:
 
 
 def _coverage(needle: Set[str], haystack: Set[str]) -> float:
-    """Fraction of `needle` tokens that also appear in `haystack`."""
     if not needle:
         return 0.0
     return len(needle & haystack) / len(needle)
@@ -69,12 +56,13 @@ def calculate_auto_metrics(
     answer: str,
     chunks: List[str],
 ) -> Dict:
-    """Return reference-free retrieval + answer quality metrics."""
+    """Reference-free retrieval, answer, and RAG metrics."""
     q_tokens = _content_tokens(question)
     a_tokens = _content_tokens(answer)
     chunk_token_sets = [_content_tokens(c) for c in (chunks or [])]
+    chunk_union: Set[str] = set().union(*chunk_token_sets) if chunk_token_sets else set()
 
-    # --- Retrieval metrics ---
+    # ----- Retrieval -----
     if chunk_token_sets and q_tokens:
         chunk_rels = [_coverage(q_tokens, ct) for ct in chunk_token_sets]
         context_relevance = sum(chunk_rels) / len(chunk_rels)
@@ -88,18 +76,21 @@ def calculate_auto_metrics(
         for i in range(len(chunk_token_sets)):
             for j in range(i + 1, len(chunk_token_sets)):
                 sims.append(_jaccard(chunk_token_sets[i], chunk_token_sets[j]))
-        diversity = 1.0 - (sum(sims) / len(sims))
+        context_diversity = 1.0 - (sum(sims) / len(sims))
     else:
-        # A single chunk is trivially "diverse"; report 1.0 to avoid penalising k=1.
-        diversity = 1.0 if chunk_token_sets else 0.0
+        context_diversity = 1.0 if chunk_token_sets else 0.0
 
-    # --- Answer metrics ---
-    chunk_union: Set[str] = set().union(*chunk_token_sets) if chunk_token_sets else set()
+    # Context coverage: how much of the retrieved context's content is reflected
+    # in the answer. A value near 0 means most chunks went unused;
+    # near 1 means the answer drew from most of the retrieved material.
+    context_coverage = _coverage(chunk_union, a_tokens) if chunk_union else 0.0
+
+    # ----- Answer / RAG -----
     faithfulness = _coverage(a_tokens, chunk_union)
+    hallucination_rate = round(1.0 - faithfulness, 4) if a_tokens else 0.0
     answer_relevance = _jaccard(q_tokens, a_tokens)
 
     if chunk_token_sets:
-        # A chunk "contributes" if it shares >=3 distinct content words with the answer.
         used = sum(1 for ct in chunk_token_sets if len(ct & a_tokens) >= 3)
         context_utilization = used / len(chunk_token_sets)
     else:
@@ -107,18 +98,20 @@ def calculate_auto_metrics(
 
     return {
         "retrieval": {
-            "context_relevance": round(context_relevance, 4),
-            "top_chunk_relevance": round(top_chunk_relevance, 4),
-            "diversity": round(diversity, 4),
+            "context_relevance":    round(context_relevance, 4),
+            "top_chunk_relevance":  round(top_chunk_relevance, 4),
+            "context_diversity":    round(context_diversity, 4),
+            "context_coverage":     round(context_coverage, 4),
         },
         "answer": {
-            "faithfulness": round(faithfulness, 4),
-            "answer_relevance": round(answer_relevance, 4),
-            "context_utilization": round(context_utilization, 4),
+            "faithfulness":         round(faithfulness, 4),
+            "hallucination_rate":   hallucination_rate,
+            "answer_relevance":     round(answer_relevance, 4),
+            "context_utilization":  round(context_utilization, 4),
         },
         "counts": {
-            "num_chunks": len(chunks or []),
-            "answer_words": len(_tokens(answer)),
+            "num_chunks":     len(chunks or []),
+            "answer_words":   len(_tokens(answer)),
             "question_words": len(_tokens(question)),
         },
     }

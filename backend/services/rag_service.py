@@ -147,20 +147,37 @@ ANSWER:"""
         encoder_type: str,
         question: str,
         k: int = 3,
-    ) -> Tuple[str, List[str], Dict[str, float]]:
-        """Full RAG query plus per-stage latency in milliseconds."""
+    ) -> Tuple[str, List[str], Dict]:
+        """Full RAG query plus per-stage latency and resource usage."""
         import time
+        from information_retrieval.evaluation.resource_metrics import ResourceSampler
 
-        t0 = time.perf_counter()
-        chunks = self.retrieve_chunks(session_id, encoder_type, question, k)
-        t1 = time.perf_counter()
-        answer = self.generate_answer(question, chunks)
-        t2 = time.perf_counter()
+        with ResourceSampler() as retr_res:
+            t0 = time.perf_counter()
+            chunks = self.retrieve_chunks(session_id, encoder_type, question, k)
+            t1 = time.perf_counter()
+
+        with ResourceSampler() as gen_res:
+            answer = self.generate_answer(question, chunks)
+            t2 = time.perf_counter()
+
+        retr_dict = retr_res.to_dict()
+        gen_dict = gen_res.to_dict()
 
         timings = {
-            "retrieval_ms": round((t1 - t0) * 1000, 2),
+            "retrieval_ms":  round((t1 - t0) * 1000, 2),
             "generation_ms": round((t2 - t1) * 1000, 2),
-            "total_ms": round((t2 - t0) * 1000, 2),
+            "total_ms":      round((t2 - t0) * 1000, 2),
+            "retrieval_resources":  retr_dict,
+            "generation_resources": gen_dict,
+            # Headline figures used by the UI table.
+            "cpu_percent":     retr_dict.get("cpu_percent"),
+            "ram_used_mb":     retr_dict.get("ram_used_mb"),
+            "ram_delta_mb":    retr_dict.get("ram_delta_mb"),
+            "gpu_mem_mb":      retr_dict.get("gpu_mem_mb"),
+            "gpu_mem_peak_mb": retr_dict.get("gpu_mem_peak_mb"),
+            "gpu_name":        retr_dict.get("gpu_name"),
+            "gpu_available":   retr_dict.get("gpu_available", True),
         }
         return answer, chunks, timings
 

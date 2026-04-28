@@ -5,6 +5,7 @@ from typing import List, Dict, Optional
 from information_retrieval.evaluation.retrieval_metrics import calculate_retrieval_metrics
 from information_retrieval.evaluation.rag_metrics import calculate_rag_metrics
 from information_retrieval.evaluation.auto_metrics import calculate_auto_metrics
+from information_retrieval.evaluation.manual_metrics import calculate_manual_metrics
 
 
 class EvaluationService:
@@ -19,6 +20,26 @@ class EvaluationService:
         """Reference-free metrics computed automatically per query."""
         try:
             return calculate_auto_metrics(question, answer, retrieved_chunks or [])
+        except Exception as e:
+            return {"error": str(e)}
+
+    def manual_evaluate(
+        self,
+        question: str,
+        generated_answer: str,
+        reference_answer: str,
+        retrieved_chunks: Optional[List[str]] = None,
+        relevant_passages: Optional[List[str]] = None,
+    ) -> Dict:
+        """Reference-based metrics (BLEU/ROUGE/BERTScore/precision@k/...)."""
+        try:
+            return calculate_manual_metrics(
+                question=question,
+                generated_answer=generated_answer,
+                reference_answer=reference_answer,
+                retrieved_chunks=retrieved_chunks or [],
+                relevant_passages=relevant_passages or [],
+            )
         except Exception as e:
             return {"error": str(e)}
 

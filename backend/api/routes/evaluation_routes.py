@@ -88,3 +88,36 @@ async def batch_evaluate(request: BatchEvaluationRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Batch evaluation failed: {str(e)}"
         )
+
+
+class ManualEvaluationRequest(BaseModel):
+    """Request model for reference-based ('manual') evaluation."""
+    question: str
+    generated_answer: str
+    reference_answer: str
+    retrieved_chunks: Optional[List[str]] = None
+    relevant_passages: Optional[List[str]] = None
+
+
+@router.post("/manual")
+async def evaluate_manual(request: ManualEvaluationRequest):
+    """
+    Compute every reference-based metric (BLEU, ROUGE-1/2/L, METEOR,
+    Exact Match, token F1, BERTScore, Answer Correctness, Completeness,
+    Precision@k, Recall@k, Hit Rate, MRR, nDCG@k).
+    """
+    from fastapi.concurrency import run_in_threadpool
+    try:
+        return await run_in_threadpool(
+            evaluation_service.manual_evaluate,
+            request.question,
+            request.generated_answer,
+            request.reference_answer,
+            request.retrieved_chunks,
+            request.relevant_passages,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Manual evaluation failed: {str(e)}",
+        )
